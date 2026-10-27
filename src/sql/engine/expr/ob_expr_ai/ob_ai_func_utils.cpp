@@ -1465,6 +1465,17 @@ int ObAIFuncModel::call_completion(ObString &prompt, ObJsonObject *config, ObStr
   ObAIFuncClient client;
   ObString unencrypted_access_key;
   ObString request_model_name = get_request_model_name();
+  if (config != nullptr && config->get_value("_ai_column_system_prompt") != nullptr) {
+    ObJsonNode *system = config->get_value("_ai_column_system_prompt");
+    if (system->json_type() != ObJsonNodeType::J_STRING) { return OB_INVALID_ARGUMENT; }
+    prompt_str = static_cast<ObJsonString *>(system)->get_str();
+    ObJsonObject *copy = nullptr;
+    if (OB_FAIL(ObAIFuncJsonUtils::get_json_object(*allocator_, copy))) { return ret; }
+    if (OB_FAIL(ObAIFuncJsonUtils::compact_json_object(*allocator_, config, copy))) { return ret; }
+    if (OB_FAIL(copy->remove("_ai_column_system_prompt"))) { return ret; }
+    config = copy;
+  }
+
   if (!is_completion_type()) {
     ret = OB_INVALID_ARGUMENT;
     LOG_USER_ERROR(OB_INVALID_ARGUMENT, "ai_complete, info type is not completion");
