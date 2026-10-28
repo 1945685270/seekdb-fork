@@ -1,0 +1,15 @@
+PREPARE
+BUILD_COMBINED
+PHASE before-1
+/workspace/seekdb/fts-round4-run.sh: line 11: 620271 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-1
+/workspace/seekdb/fts-round4-run.sh: line 11: 621067 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-2
+/workspace/seekdb/fts-round4-run.sh: line 11: 621938 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-2
+/workspace/seekdb/fts-round4-run.sh: line 11: 622423 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-3
+/workspace/seekdb/fts-round4-run.sh: line 11: 622883 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-3
+/workspace/seekdb/fts-round4-run.sh: line 11: 623326 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+COMPLETE

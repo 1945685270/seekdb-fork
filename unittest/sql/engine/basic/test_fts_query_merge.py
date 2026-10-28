@@ -34,10 +34,14 @@ def statements():
                 elif stage == 2:
                     sql += ["ALTER TABLE docs DROP INDEX ft",
                             "ALTER TABLE docs ADD FULLTEXT INDEX ft(body) WITH PARSER " + parser]
-                for query in ("alpha", "alpha beta gamma", "alpha alpha beta",
-                              "delta absent", "数据库 全文索引", "absent",
-                              "alpha " + " ".join(terms)):
-                    expr = "MATCH(body) AGAINST('%s')" % query
+                queries = [(q, "") for q in (
+                    "alpha", "alpha beta", "alpha beta gamma", "alpha beta gamma delta",
+                    "alpha alpha beta", "delta absent", "数据库 全文索引", "absent",
+                    "alpha " + " ".join(terms))]
+                queries += [(q, " IN BOOLEAN MODE") for q in
+                            ("+alpha -gamma", "alpha beta", "+alpha +beta")]
+                for query, mode in queries:
+                    expr = "MATCH(body) AGAINST('%s'%s)" % (query, mode)
                     sql.append("SELECT 'case_%d'" % cases)
                     sql += ["SELECT COUNT(*) FROM docs WHERE " + expr,
                             "SELECT id,%s FROM docs WHERE %s ORDER BY id" % (expr, expr),

@@ -1,0 +1,1 @@
+PASS: 48 sparse-vector queries and 4 ordinary scan queries match baseline

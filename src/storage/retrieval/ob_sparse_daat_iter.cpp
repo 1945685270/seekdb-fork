@@ -415,7 +415,26 @@ int ObSRDaaTIterImpl::project_results(const int64_t count)
   ObEvalCtx *eval_ctx = iter_param_->eval_ctx_;
   ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
 
-  if (eval_ctx->is_vectorized()) {
+  const bool need_relevance = iter_param_->need_project_relevance();
+  if (eval_ctx->is_vectorized() && id_proj_expr->is_batch_result()
+      && (!need_relevance || relevance_proj_expr->is_batch_result())) {
+    // Prepare each output buffer and its evaluation flags once per batch.
+    ObDatum *ids = id_proj_expr->locate_datums_for_update(*eval_ctx, count);
+    ObDatum *scores = need_relevance
+        ? relevance_proj_expr->locate_datums_for_update(*eval_ctx, count) : nullptr;
+    for (int64_t i = 0; i < count; ++i) {
+      set_datum_func_(ids[i], buffered_domain_ids_[i]);
+      if (need_relevance) {
+        scores[i].set_double(buffered_relevances_[i]);
+      }
+    }
+    id_proj_expr->get_evaluated_flags(*eval_ctx).set_all(count);
+    id_proj_expr->set_evaluated_projected(*eval_ctx);
+    if (need_relevance) {
+      relevance_proj_expr->get_evaluated_flags(*eval_ctx).set_all(count);
+      relevance_proj_expr->set_evaluated_projected(*eval_ctx);
+    }
+  } else if (eval_ctx->is_vectorized()) {
     sql::ObBitVector &id_evaluated_flags = id_proj_expr->get_evaluated_flags(*eval_ctx);
     for (int64_t i = 0; i < count; ++i) {
       guard.set_batch_idx(i);

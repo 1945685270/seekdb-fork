@@ -1,0 +1,258 @@
+diff --git a/src/sql/engine/table/ob_table_scan_op.cpp b/src/sql/engine/table/ob_table_scan_op.cpp
+index 1a9cea580..3c82183e6 100644
+--- a/src/sql/engine/table/ob_table_scan_op.cpp
++++ b/src/sql/engine/table/ob_table_scan_op.cpp
+@@ -679,6 +679,7 @@ ObTableScanOp::ObTableScanOp(ObExecContext &exec_ctx, const ObOpSpec &spec, ObOp
+     in_rescan_(false),
+     domain_index_(),
+     fts_index_(),
++    fts_output_exprs_{},
+     output_   (nullptr),
+     fold_iter_(nullptr),
+     iter_tree_(nullptr),
+@@ -1439,6 +1440,7 @@ int ObTableScanOp::inner_open()
+   } else if (OB_FAIL(init_table_scan_rtdef())) {
+   } else if (MY_SPEC.is_fts_ddl_ && OB_FAIL(fts_index_.init(MY_SPEC.is_fts_index_aux_, MY_SPEC.parser_name_,
+           MY_SPEC.parser_properties_))) {
++  } else if (MY_SPEC.is_fts_ddl_ && OB_FAIL(init_fts_output_exprs())) {
+   } else {
+     if (MY_SPEC.report_col_checksum_) {
+       if (PHY_TABLE_SCAN == MY_SPEC.get_type()) {
+@@ -3648,16 +3650,14 @@ int ObTableScanOp::fetch_next_fts_index_rows()
+   int ret = OB_SUCCESS;
+   bool has_segment_word = false;
+   while (OB_SUCC(ret) && !has_segment_word) {
+-    ObExpr *ft_expr = nullptr;
+-    ObExpr *doc_id_expr = nullptr;
++    ObExpr *ft_expr = fts_output_exprs_[MY_SPEC.is_fts_index_aux_ ? 0 : 1];
++    ObExpr *doc_id_expr = fts_output_exprs_[MY_SPEC.is_fts_index_aux_ ? 1 : 0];
+     ObDatum *ft_datum = nullptr;
+     ObDatum *doc_id_datum = nullptr;
+ 
+     if (OB_FAIL(ObTableScanOp::inner_get_next_row_implement())) {
+       if (OB_ITER_END != ret) {
+       }
+-    } else if (OB_FAIL(get_output_fts_col_expr_by_type(T_FUN_SYS_DOC_ID, doc_id_expr))) {
+-    } else if (OB_FAIL(get_output_fts_col_expr_by_type(T_FUN_SYS_WORD_SEGMENT, ft_expr))) {
+     } else if (OB_ISNULL(ft_expr) || OB_ISNULL(doc_id_expr)) {
+       ret = OB_ERR_UNEXPECTED;
+     } else if (OB_FAIL(ft_expr->eval(eval_ctx_, ft_datum))) {
+@@ -3689,13 +3689,13 @@ int ObTableScanOp::fill_generated_fts_cols(blocksstable::ObDatumRow *row)
+ {
+   int ret = OB_SUCCESS;
+   const ObObjDatumMapType *types = MY_SPEC.is_fts_index_aux_ ? ObFTIndexRowCache::FTS_INDEX_TYPES : ObFTIndexRowCache::FTS_DOC_WORD_TYPES;
+-  const ObExprOperatorType *expr_types = MY_SPEC.is_fts_index_aux_ ? ObFTIndexRowCache::FTS_INDEX_EXPR_TYPE : ObFTIndexRowCache::FTS_DOC_WORD_EXPR_TYPE;
+   if (OB_ISNULL(row)) {
+     ret = OB_INVALID_ARGUMENT;
+   } else {
+     for (int64_t i = 0; OB_SUCC(ret) && i < share::ObFtsIndexBuilderUtil::OB_FTS_INDEX_OR_DOC_WORD_TABLE_COL_CNT; ++i) {
+-      ObExpr *expr = nullptr;
+-      if (OB_FAIL(get_output_fts_col_expr_by_type(expr_types[i], expr))) {
++      ObExpr *expr = fts_output_exprs_[i];
++      if (OB_ISNULL(expr)) {
++        ret = OB_ERR_UNEXPECTED;
+       } else {
+         ObDatum &datum = expr->locate_datum_for_write(eval_ctx_);
+         ObEvalInfo &eval_info = expr->get_eval_info(eval_ctx_);
+@@ -3710,6 +3710,18 @@ int ObTableScanOp::fill_generated_fts_cols(blocksstable::ObDatumRow *row)
+   return ret;
+ }
+ 
++int ObTableScanOp::init_fts_output_exprs()
++{
++  int ret = OB_SUCCESS;
++  const ObExprOperatorType *types = MY_SPEC.is_fts_index_aux_
++      ? ObFTIndexRowCache::FTS_INDEX_EXPR_TYPE : ObFTIndexRowCache::FTS_DOC_WORD_EXPR_TYPE;
++  for (int64_t i = 0; OB_SUCC(ret) && i < share::ObFtsIndexBuilderUtil::OB_FTS_INDEX_OR_DOC_WORD_TABLE_COL_CNT; ++i) {
++    if (OB_FAIL(get_output_fts_col_expr_by_type(types[i], fts_output_exprs_[i]))) {
++    }
++  }
++  return ret;
++}
++
+ int ObTableScanOp::get_output_fts_col_expr_by_type(
+     const ObExprOperatorType &type,
+     ObExpr *&expr)
+diff --git a/src/sql/engine/table/ob_table_scan_op.h b/src/sql/engine/table/ob_table_scan_op.h
+index c81c665c9..3525d669a 100644
+--- a/src/sql/engine/table/ob_table_scan_op.h
++++ b/src/sql/engine/table/ob_table_scan_op.h
+@@ -704,6 +704,7 @@ private:
+   int inner_get_next_fts_index_row();
+   int fetch_next_fts_index_rows();
+   int fill_generated_fts_cols(blocksstable::ObDatumRow *row);
++  int init_fts_output_exprs();
+   int get_output_fts_col_expr_by_type(const ObExprOperatorType &type, ObExpr *&expr);
+   bool is_resume_point_saved();
+ protected:
+@@ -735,6 +736,7 @@ protected:
+   bool in_rescan_;
+   ObDomainIndexCache domain_index_;
+   ObFTIndexRowCache fts_index_;
++  ObExpr *fts_output_exprs_[share::ObFtsIndexBuilderUtil::OB_FTS_INDEX_OR_DOC_WORD_TABLE_COL_CNT];
+ 
+   // output_ is used to output data, TSC operator directly invokes output_::get_next_row(s),
+   // it points to fold_iter_ in group rescan and iter_tree_ in normal scan.
+diff --git a/src/storage/retrieval/ob_sparse_daat_iter.cpp b/src/storage/retrieval/ob_sparse_daat_iter.cpp
+index fd8e2993f..4c496b1c1 100644
+--- a/src/storage/retrieval/ob_sparse_daat_iter.cpp
++++ b/src/storage/retrieval/ob_sparse_daat_iter.cpp
+@@ -415,7 +415,26 @@ int ObSRDaaTIterImpl::project_results(const int64_t count)
+   ObEvalCtx *eval_ctx = iter_param_->eval_ctx_;
+   ObEvalCtx::BatchInfoScopeGuard guard(*eval_ctx);
+ 
+-  if (eval_ctx->is_vectorized()) {
++  const bool need_relevance = iter_param_->need_project_relevance();
++  if (eval_ctx->is_vectorized() && id_proj_expr->is_batch_result()
++      && (!need_relevance || relevance_proj_expr->is_batch_result())) {
++    // Prepare each output buffer and its evaluation flags once per batch.
++    ObDatum *ids = id_proj_expr->locate_datums_for_update(*eval_ctx, count);
++    ObDatum *scores = need_relevance
++        ? relevance_proj_expr->locate_datums_for_update(*eval_ctx, count) : nullptr;
++    for (int64_t i = 0; i < count; ++i) {
++      set_datum_func_(ids[i], buffered_domain_ids_[i]);
++      if (need_relevance) {
++        scores[i].set_double(buffered_relevances_[i]);
++      }
++    }
++    id_proj_expr->get_evaluated_flags(*eval_ctx).set_all(count);
++    id_proj_expr->set_evaluated_projected(*eval_ctx);
++    if (need_relevance) {
++      relevance_proj_expr->get_evaluated_flags(*eval_ctx).set_all(count);
++      relevance_proj_expr->set_evaluated_projected(*eval_ctx);
++    }
++  } else if (eval_ctx->is_vectorized()) {
+     sql::ObBitVector &id_evaluated_flags = id_proj_expr->get_evaluated_flags(*eval_ctx);
+     for (int64_t i = 0; i < count; ++i) {
+       guard.set_batch_idx(i);
+diff --git a/src/storage/retrieval/ob_text_daat_iter.cpp b/src/storage/retrieval/ob_text_daat_iter.cpp
+index 7836d0f1f..e7563154a 100644
+--- a/src/storage/retrieval/ob_text_daat_iter.cpp
++++ b/src/storage/retrieval/ob_text_daat_iter.cpp
+@@ -38,8 +38,89 @@ int ObTextDaaTIter::init(const ObTextDaaTParam &param)
+   return ret;
+ }
+ 
++// For up to three natural-language terms, keep one head per posting list.
++// Equal document IDs are still collected in ascending term-index order, exactly
++// as ObSimpleRowsMerger does. Boolean and larger queries use the existing path.
++int ObTextDaaTIter::do_one_merge_round(int64_t &count)
++{
++  int ret = OB_SUCCESS;
++  const int64_t dim_count = dim_iters_->count();
++  if (dim_count > 3 || mode_flag_ != sql::ObMatchAgainstMode::NATURAL_LANGUAGE_MODE) {
++    ret = ObSRDaaTIterImpl::do_one_merge_round(count);
++  } else {
++    for (int64_t i = 0; OB_SUCC(ret) && i < next_round_cnt_; ++i) {
++      const int64_t idx = next_round_iter_idxes_[i];
++      ObISRDaaTDimIter *iter = dim_iters_->at(idx);
++      small_active_[idx] = false;
++      if (OB_ISNULL(iter)) {
++        ret = OB_ERR_UNEXPECTED;
++      } else if (OB_FAIL(iter->get_next_row())) {
++        if (OB_ITER_END == ret) {
++          ret = OB_SUCCESS;
++        }
++      } else if (OB_FAIL(iter->get_curr_score(small_scores_[idx]))) {
++      } else if (OB_FAIL(iter->get_curr_id(iter_domain_ids_[idx]))) {
++      } else {
++        if (OB_NOT_NULL(iter_param_->dim_weights_)) {
++          small_scores_[idx] = small_scores_[idx] * iter_param_->field_boost_
++                              * iter_param_->dim_weights_->at(idx);
++        }
++        small_active_[idx] = true;
++      }
++    }
++    next_round_cnt_ = 0;
++    int64_t winner = -1;
++    uint64_t matched = 0;
++    for (int64_t i = 0; OB_SUCC(ret) && i < dim_count; ++i) {
++      if (!small_active_[i]) {
++      } else if (winner < 0) {
++        winner = i;
++        matched = 1ULL << i;
++      } else {
++        ObSRMergeItem left;
++        ObSRMergeItem right;
++        left.iter_idx_ = i;
++        right.iter_idx_ = winner;
++        int64_t cmp = 0;
++        if (OB_FAIL(merge_cmp_.cmp(left, right, cmp))) {
++        } else if (cmp < 0) {
++          winner = i;
++          matched = 1ULL << i;
++        } else if (cmp == 0) {
++          matched |= 1ULL << i;
++        }
++      }
++    }
++    const ObDatum *id = nullptr;
++    double relevance = 0.0;
++    bool need_project = false;
++    if (OB_SUCC(ret) && winner < 0) {
++      ret = OB_ITER_END;
++    }
++    for (int64_t i = 0; OB_SUCC(ret) && i < dim_count; ++i) {
++      if (matched & (1ULL << i)) {
++        if (OB_FAIL(relevance_collector_->collect_one_dim(i, small_scores_[i]))) {
++        } else {
++          id = iter_domain_ids_[i];
++          next_round_iter_idxes_[next_round_cnt_++] = i;
++        }
++      }
++    }
++    if (OB_FAIL(ret)) {
++    } else if (OB_ISNULL(id)) {
++      ret = OB_ERR_UNEXPECTED;
++    } else if (OB_FAIL(relevance_collector_->get_result(relevance, need_project))) {
++    } else if (need_project && OB_FAIL(process_collected_row(*id, relevance))) {
++    } else if (need_project && OB_FAIL(filter_on_demand(count, relevance, need_project))) {
++    } else if (need_project && OB_FAIL(cache_result(count, *id, relevance))) {
++    }
++  }
++  return ret;
++}
++
+ void ObTextDaaTIter::reset()
+ {
++  MEMSET(small_active_, 0, sizeof(small_active_));
+   bm25_param_estimator_.reset();
+   // this class can know the type of dim_iters_, but ObSRDaaTIterImpl maybe not
+   if (OB_NOT_NULL(dim_iters_)) {
+@@ -52,6 +133,7 @@ void ObTextDaaTIter::reset()
+ 
+ void ObTextDaaTIter::reuse(const bool switch_tablet)
+ {
++  MEMSET(small_active_, 0, sizeof(small_active_));
+   if ((OB_NOT_NULL(dim_iters_) && 0 == dim_iters_->count())) {
+     // do nothing
+   } else {
+diff --git a/src/storage/retrieval/ob_text_daat_iter.h b/src/storage/retrieval/ob_text_daat_iter.h
+index ef90a0f1f..f3e00a679 100644
+--- a/src/storage/retrieval/ob_text_daat_iter.h
++++ b/src/storage/retrieval/ob_text_daat_iter.h
+@@ -55,7 +55,9 @@ public:
+   ObTextDaaTIter() : ObSRDaaTIterImpl(),
+       bm25_param_estimator_(),
+       mode_flag_(sql::ObMatchAgainstMode::NATURAL_LANGUAGE_MODE),
+-      function_lookup_mode_(false) {}
++      function_lookup_mode_(false),
++      small_active_{false, false, false},
++      small_scores_{0.0, 0.0, 0.0} {}
+   virtual ~ObTextDaaTIter() { reset(); }
+ 
+   int init(const ObTextDaaTParam &param);
+@@ -63,10 +65,13 @@ public:
+   virtual void reset() override;
+ protected:
+   virtual int pre_process() override;
++  virtual int do_one_merge_round(int64_t &count) override;
+ protected:
+   ObBM25ParamEstimator bm25_param_estimator_;
+   sql::ObMatchAgainstMode mode_flag_;
+   bool function_lookup_mode_;
++  bool small_active_[3];
++  double small_scores_[3];
+ private:
+   DISALLOW_COPY_AND_ASSIGN(ObTextDaaTIter);
+ };

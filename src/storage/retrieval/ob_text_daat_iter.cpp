@@ -38,8 +38,89 @@ int ObTextDaaTIter::init(const ObTextDaaTParam &param)
   return ret;
 }
 
+// For up to three natural-language terms, keep one head per posting list.
+// Equal document IDs are still collected in ascending term-index order, exactly
+// as ObSimpleRowsMerger does. Boolean and larger queries use the existing path.
+int ObTextDaaTIter::do_one_merge_round(int64_t &count)
+{
+  int ret = OB_SUCCESS;
+  const int64_t dim_count = dim_iters_->count();
+  if (dim_count > 3 || mode_flag_ != sql::ObMatchAgainstMode::NATURAL_LANGUAGE_MODE) {
+    ret = ObSRDaaTIterImpl::do_one_merge_round(count);
+  } else {
+    for (int64_t i = 0; OB_SUCC(ret) && i < next_round_cnt_; ++i) {
+      const int64_t idx = next_round_iter_idxes_[i];
+      ObISRDaaTDimIter *iter = dim_iters_->at(idx);
+      small_active_[idx] = false;
+      if (OB_ISNULL(iter)) {
+        ret = OB_ERR_UNEXPECTED;
+      } else if (OB_FAIL(iter->get_next_row())) {
+        if (OB_ITER_END == ret) {
+          ret = OB_SUCCESS;
+        }
+      } else if (OB_FAIL(iter->get_curr_score(small_scores_[idx]))) {
+      } else if (OB_FAIL(iter->get_curr_id(iter_domain_ids_[idx]))) {
+      } else {
+        if (OB_NOT_NULL(iter_param_->dim_weights_)) {
+          small_scores_[idx] = small_scores_[idx] * iter_param_->field_boost_
+                              * iter_param_->dim_weights_->at(idx);
+        }
+        small_active_[idx] = true;
+      }
+    }
+    next_round_cnt_ = 0;
+    int64_t winner = -1;
+    uint64_t matched = 0;
+    for (int64_t i = 0; OB_SUCC(ret) && i < dim_count; ++i) {
+      if (!small_active_[i]) {
+      } else if (winner < 0) {
+        winner = i;
+        matched = 1ULL << i;
+      } else {
+        ObSRMergeItem left;
+        ObSRMergeItem right;
+        left.iter_idx_ = i;
+        right.iter_idx_ = winner;
+        int64_t cmp = 0;
+        if (OB_FAIL(merge_cmp_.cmp(left, right, cmp))) {
+        } else if (cmp < 0) {
+          winner = i;
+          matched = 1ULL << i;
+        } else if (cmp == 0) {
+          matched |= 1ULL << i;
+        }
+      }
+    }
+    const ObDatum *id = nullptr;
+    double relevance = 0.0;
+    bool need_project = false;
+    if (OB_SUCC(ret) && winner < 0) {
+      ret = OB_ITER_END;
+    }
+    for (int64_t i = 0; OB_SUCC(ret) && i < dim_count; ++i) {
+      if (matched & (1ULL << i)) {
+        if (OB_FAIL(relevance_collector_->collect_one_dim(i, small_scores_[i]))) {
+        } else {
+          id = iter_domain_ids_[i];
+          next_round_iter_idxes_[next_round_cnt_++] = i;
+        }
+      }
+    }
+    if (OB_FAIL(ret)) {
+    } else if (OB_ISNULL(id)) {
+      ret = OB_ERR_UNEXPECTED;
+    } else if (OB_FAIL(relevance_collector_->get_result(relevance, need_project))) {
+    } else if (need_project && OB_FAIL(process_collected_row(*id, relevance))) {
+    } else if (need_project && OB_FAIL(filter_on_demand(count, relevance, need_project))) {
+    } else if (need_project && OB_FAIL(cache_result(count, *id, relevance))) {
+    }
+  }
+  return ret;
+}
+
 void ObTextDaaTIter::reset()
 {
+  MEMSET(small_active_, 0, sizeof(small_active_));
   bm25_param_estimator_.reset();
   // this class can know the type of dim_iters_, but ObSRDaaTIterImpl maybe not
   if (OB_NOT_NULL(dim_iters_)) {
@@ -52,6 +133,7 @@ void ObTextDaaTIter::reset()
 
 void ObTextDaaTIter::reuse(const bool switch_tablet)
 {
+  MEMSET(small_active_, 0, sizeof(small_active_));
   if ((OB_NOT_NULL(dim_iters_) && 0 == dim_iters_->count())) {
     // do nothing
   } else {
