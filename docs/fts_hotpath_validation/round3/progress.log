@@ -1,0 +1,26 @@
+PREPARE
+BUILD_PROPERTIES_REFERENCE
+BUILD_QUERY_CANDIDATE
+RECORD_OLD_BASELINE
+ERROR 1210 (HY000) at line 1062: Incorrect arguments to the max_token_size must be in [10, 84]
+
+/workspace/seekdb/fts-round3-run.sh: line 11: 597821 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+RECORD_OLD_BASELINE
+ERROR 4016 (HY000) at line 282: Internal error
+
+/workspace/seekdb/fts-round3-resume.sh: line 11: 601354 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+RECORD_OLD_BASELINE
+/workspace/seekdb/fts-round3-resume.sh: line 11: 602275 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-1
+/workspace/seekdb/fts-round3-resume.sh: line 11: 602639 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-1
+/workspace/seekdb/fts-round3-resume.sh: line 11: 603494 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-2
+/workspace/seekdb/fts-round3-resume.sh: line 11: 604365 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-2
+/workspace/seekdb/fts-round3-resume.sh: line 11: 604856 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-3
+/workspace/seekdb/fts-round3-resume.sh: line 11: 605336 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-3
+/workspace/seekdb/fts-round3-resume.sh: line 11: 605801 Killed                  "$1" --nodaemon --base-dir /workspace/seekdb/fts-round2/run --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+COMPLETE

@@ -1,0 +1,114 @@
+diff --git a/src/sql/das/iter/ob_das_text_retrieval_merge_iter.cpp b/src/sql/das/iter/ob_das_text_retrieval_merge_iter.cpp
+index 34682ebbc..1c3ca7d55 100644
+--- a/src/sql/das/iter/ob_das_text_retrieval_merge_iter.cpp
++++ b/src/sql/das/iter/ob_das_text_retrieval_merge_iter.cpp
+@@ -1100,7 +1100,7 @@ int ObDASTRTaatIter::init_stores_by_partition()
+         ret = OB_ALLOCATE_MEMORY_FAILED;
+       } else {
+         ObDASTRTaatHashMap *hash_map = new(buf) ObDASTRTaatHashMap();
+-        if (OB_FAIL(hash_map->create(10, common::ObMemAttr("FTTaatMap")))) {
++        if (OB_FAIL(hash_map->create(OB_HASHMAP_DEFAULT_SIZE, common::ObMemAttr("FTTaatMap")))) {
+         } else {
+           hash_maps_[i] = hash_map;
+         }
+@@ -1206,7 +1206,7 @@ int ObDASTRTaatIter::fill_chunk_store_by_tr_iter()
+               if (OB_UNLIKELY(doc_id_datum.is_null()) || OB_ISNULL(doc_id_datum.ptr_)) {
+                 ret = OB_ERR_UNEXPECTED;
+               } else {
+-                uint64_t partition = murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
++                uint64_t partition = 1 == hash_map_size_ ? 0 : murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
+                 skips[partition]->unset(i);
+               }
+             }
+@@ -1240,7 +1240,7 @@ int ObDASTRTaatIter::fill_chunk_store_by_tr_iter()
+             if (OB_UNLIKELY(doc_id_datum.is_null()) || OB_ISNULL(doc_id_datum.ptr_)) {
+               ret = OB_ERR_UNEXPECTED;
+             } else {
+-              uint64_t partition = murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
++              uint64_t partition = 1 == hash_map_size_ ? 0 : murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
+               ObChunkDatumStore::StoredRow **sr = NULL;
+               if (OB_FAIL(datum_stores_[partition]->add_row(exprs,
+                                                             ir_rtdef_->get_inv_idx_scan_rtdef()->eval_ctx_,
+@@ -1346,7 +1346,7 @@ int ObDASTRTaatIter::inner_load_next_hashmap()
+ 
+   ObDocIdExt doc_id;
+   double cur_relevance = 0;
+-  double last_relevance = 0;
++
+   while (OB_SUCC(ret)) {
+     if (OB_FAIL(store_iter->get_next_row(*ctx, exprs))) {
+       if (OB_UNLIKELY(OB_ITER_END != ret)) {
+@@ -1357,11 +1357,11 @@ int ObDASTRTaatIter::inner_load_next_hashmap()
+       } else if (need_relevance) {
+         ObDatum &relevance_datum = relevance_expr->locate_expr_datum(*ir_rtdef_->eval_ctx_);
+         cur_relevance = relevance_datum.get_double();
+-        if (OB_FAIL(map->get_refactored(doc_id, last_relevance))) {
+-          if (OB_HASH_NOT_EXIST != ret) {
+-          } else if (OB_FAIL(map->set_refactored(doc_id, cur_relevance, 1/*overwrite*/))) {
+-          }
+-        } else if (OB_FAIL(map->set_refactored(doc_id, cur_relevance + last_relevance, 1/*overwrite*/))) {
++        // Preserve the original addition order while searching the bucket only once.
++        auto add_relevance = [cur_relevance](auto &entry) {
++          entry.second = cur_relevance + entry.second;
++        };
++        if (OB_FAIL(map->set_or_update(doc_id, cur_relevance, add_relevance))) {
+         }
+       } else {
+         if (OB_FAIL(map->set_refactored(doc_id, 1, 0/*overwrite*/))) {
+diff --git a/src/storage/retrieval/ob_sparse_taat_iter.cpp b/src/storage/retrieval/ob_sparse_taat_iter.cpp
+index 6a4a03d0f..360896e6d 100644
+--- a/src/storage/retrieval/ob_sparse_taat_iter.cpp
++++ b/src/storage/retrieval/ob_sparse_taat_iter.cpp
+@@ -218,7 +218,7 @@ int ObSRTaaTIterImpl::init_chunk_stores()
+         ret = OB_ALLOCATE_MEMORY_FAILED;
+       } else {
+         ObSRTaaTHashMap *hash_map = new (buf) ObSRTaaTHashMap();
+-        if (OB_FAIL(hash_map->create(10, common::ObMemAttr("FTTaatMap")))) {
++        if (OB_FAIL(hash_map->create(OB_HASHMAP_DEFAULT_SIZE, common::ObMemAttr("FTTaatMap")))) {
+         } else {
+           hash_maps_[i] = hash_map;
+         }
+@@ -285,7 +285,7 @@ int ObSRTaaTIterImpl::fill_chunk_stores()
+               if (OB_UNLIKELY(id_datum.is_null()) || OB_ISNULL(id_datum.ptr_)) {
+                 ret = OB_ERR_UNEXPECTED;
+               } else {
+-                uint64_t partition = murmurhash(id_datum.ptr_, id_datum.len_, 0) % partition_cnt_;
++                uint64_t partition = 1 == partition_cnt_ ? 0 : murmurhash(id_datum.ptr_, id_datum.len_, 0) % partition_cnt_;
+                 skips_[partition]->unset(i);
+               }
+             }
+@@ -316,7 +316,7 @@ int ObSRTaaTIterImpl::fill_chunk_stores()
+             if (OB_UNLIKELY(id_datum.is_null()) || OB_ISNULL(id_datum.ptr_)) {
+               ret = OB_ERR_UNEXPECTED;
+             } else {
+-              uint64_t partition = murmurhash(id_datum.ptr_, id_datum.len_, 0) % partition_cnt_;
++              uint64_t partition = 1 == partition_cnt_ ? 0 : murmurhash(id_datum.ptr_, id_datum.len_, 0) % partition_cnt_;
+               if (OB_FAIL(query::spill_row_store_add_row(
+                   datum_stores_[partition], exprs, *eval_ctx))) {
+               } else {
+@@ -386,7 +386,7 @@ int ObSRTaaTIterImpl::load_next_hash_map()
+ 
+     ObDocIdExt id;
+     double cur_relevance = 0.0;
+-    double last_relevance = 0.0;
++
+     while (OB_SUCC(ret)) {
+       if (OB_FAIL(query::spill_row_store_next_row(
+           store_iter, *eval_ctx, exprs))) {
+@@ -398,11 +398,11 @@ int ObSRTaaTIterImpl::load_next_hash_map()
+         } else if (iter_param_->need_project_relevance()) {
+           ObDatum &relevance_datum = iter_param_->relevance_expr_->locate_expr_datum(*eval_ctx);
+           cur_relevance = relevance_datum.get_double();
+-          if (OB_FAIL(map->get_refactored(id, last_relevance))) {
+-            if (OB_HASH_NOT_EXIST != ret) {
+-            } else if (OB_FAIL(map->set_refactored(id, cur_relevance, 1 /* overwrite */))) {
+-            }
+-          } else if (OB_FAIL(map->set_refactored(id, cur_relevance + last_relevance, 1 /* overwrite */))) {
++          // Preserve the original addition order while searching the bucket only once.
++          auto add_relevance = [cur_relevance](auto &entry) {
++            entry.second = cur_relevance + entry.second;
++          };
++          if (OB_FAIL(map->set_or_update(id, cur_relevance, add_relevance))) {
+           }
+         } else {
+           if (OB_FAIL(map->set_refactored(id, 1.0, 0 /* overwrite */))) {

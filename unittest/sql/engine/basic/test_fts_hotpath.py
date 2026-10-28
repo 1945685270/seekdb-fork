@@ -47,7 +47,7 @@ def statements():
                           ("ngram2", '[{"output":"all"}]'),
                           ("beng", '[]'),
                           ("ik", '[]'),
-                          ("space", '[{"output":"all"},{"additional_args":[{"min_token_size":2},{"max_token_size":6}]}]')]:
+                          ("space", '[{"output":"all"},{"additional_args":[{"min_token_size":2},{"max_token_size":10}]}]')]:
         for text in samples:
             sql.append("SELECT 'token_%d', HEX(CAST(TOKENIZE(%s,'%s','%s') AS CHAR))"
                        % (case, literal(text), parser, props))

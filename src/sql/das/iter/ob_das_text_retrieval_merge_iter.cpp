@@ -1100,7 +1100,7 @@ int ObDASTRTaatIter::init_stores_by_partition()
         ret = OB_ALLOCATE_MEMORY_FAILED;
       } else {
         ObDASTRTaatHashMap *hash_map = new(buf) ObDASTRTaatHashMap();
-        if (OB_FAIL(hash_map->create(10, common::ObMemAttr("FTTaatMap")))) {
+        if (OB_FAIL(hash_map->create(OB_HASHMAP_DEFAULT_SIZE, common::ObMemAttr("FTTaatMap")))) {
         } else {
           hash_maps_[i] = hash_map;
         }
@@ -1206,7 +1206,7 @@ int ObDASTRTaatIter::fill_chunk_store_by_tr_iter()
               if (OB_UNLIKELY(doc_id_datum.is_null()) || OB_ISNULL(doc_id_datum.ptr_)) {
                 ret = OB_ERR_UNEXPECTED;
               } else {
-                uint64_t partition = murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
+                uint64_t partition = 1 == hash_map_size_ ? 0 : murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
                 skips[partition]->unset(i);
               }
             }
@@ -1240,7 +1240,7 @@ int ObDASTRTaatIter::fill_chunk_store_by_tr_iter()
             if (OB_UNLIKELY(doc_id_datum.is_null()) || OB_ISNULL(doc_id_datum.ptr_)) {
               ret = OB_ERR_UNEXPECTED;
             } else {
-              uint64_t partition = murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
+              uint64_t partition = 1 == hash_map_size_ ? 0 : murmurhash(doc_id_datum.ptr_, doc_id_datum.len_, 0) % hash_map_size_;
               ObChunkDatumStore::StoredRow **sr = NULL;
               if (OB_FAIL(datum_stores_[partition]->add_row(exprs,
                                                             ir_rtdef_->get_inv_idx_scan_rtdef()->eval_ctx_,
@@ -1346,7 +1346,7 @@ int ObDASTRTaatIter::inner_load_next_hashmap()
 
   ObDocIdExt doc_id;
   double cur_relevance = 0;
-  double last_relevance = 0;
+
   while (OB_SUCC(ret)) {
     if (OB_FAIL(store_iter->get_next_row(*ctx, exprs))) {
       if (OB_UNLIKELY(OB_ITER_END != ret)) {
@@ -1357,11 +1357,11 @@ int ObDASTRTaatIter::inner_load_next_hashmap()
       } else if (need_relevance) {
         ObDatum &relevance_datum = relevance_expr->locate_expr_datum(*ir_rtdef_->eval_ctx_);
         cur_relevance = relevance_datum.get_double();
-        if (OB_FAIL(map->get_refactored(doc_id, last_relevance))) {
-          if (OB_HASH_NOT_EXIST != ret) {
-          } else if (OB_FAIL(map->set_refactored(doc_id, cur_relevance, 1/*overwrite*/))) {
-          }
-        } else if (OB_FAIL(map->set_refactored(doc_id, cur_relevance + last_relevance, 1/*overwrite*/))) {
+        // Preserve the original addition order while searching the bucket only once.
+        auto add_relevance = [cur_relevance](auto &entry) {
+          entry.second = cur_relevance + entry.second;
+        };
+        if (OB_FAIL(map->set_or_update(doc_id, cur_relevance, add_relevance))) {
         }
       } else {
         if (OB_FAIL(map->set_refactored(doc_id, 1, 0/*overwrite*/))) {
