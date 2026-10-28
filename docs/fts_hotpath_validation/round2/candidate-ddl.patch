@@ -1,0 +1,42 @@
+diff --git a/src/rootserver/ddl_task/ob_fts_index_build_task.cpp b/src/rootserver/ddl_task/ob_fts_index_build_task.cpp
+index 90793ae41..5fdbbfb25 100644
+--- a/src/rootserver/ddl_task/ob_fts_index_build_task.cpp
++++ b/src/rootserver/ddl_task/ob_fts_index_build_task.cpp
+@@ -210,6 +210,25 @@ int ObFtsIndexBuildTask::init(const ObDDLTaskRecord &task_record)
+ }
+ 
+ int ObFtsIndexBuildTask::process()
++{
++  int ret = OB_SUCCESS;
++  // Bound the amount of synchronous work so other DDL tasks remain fair.
++  // A persisted state transition can run its successor without another queue
++  // round trip. Unchanged/waiting states keep the scheduler's normal backoff.
++  const int64_t max_stages = is_fts_task() ? 4 : 1;
++  for (int64_t i = 0; i < max_stages; ++i) {
++    const int64_t previous_status = task_status_;
++    ret = process_one_stage();
++    if (OB_SUCCESS != ret || !need_retry() || task_status_ == previous_status
++        || ObDDLTaskStatus::FAIL == task_status_
++        || ObDDLTaskStatus::SUCCESS == task_status_) {
++      break;
++    }
++  }
++  return ret;
++}
++
++int ObFtsIndexBuildTask::process_one_stage()
+ {
+   int ret = OB_SUCCESS;
+   ObIndexType index_type = create_index_arg_.index_type_;
+diff --git a/src/rootserver/ddl_task/ob_fts_index_build_task.h b/src/rootserver/ddl_task/ob_fts_index_build_task.h
+index 1ed35a6b6..0794cbf87 100644
+--- a/src/rootserver/ddl_task/ob_fts_index_build_task.h
++++ b/src/rootserver/ddl_task/ob_fts_index_build_task.h
+@@ -116,6 +116,7 @@ public:
+   int update_task_message(common::ObISQLClient &proxy);
+ 
+ private:
++  int process_one_stage();
+   bool is_fts_task() const { return task_type_ == share::DDL_CREATE_FTS_INDEX; }
+   bool is_multivalue_task() const { return task_type_ == share::DDL_CREATE_MULTIVALUE_INDEX; }
+   bool is_spiv_task() const { return task_type_ == share::DDL_CREATE_VEC_SPIV_INDEX; }

@@ -1,0 +1,50 @@
+[  1%] Built target rust_staticlibs_build
+[  1%] Built target seekdb_jemalloc_build
+[  7%] Built target zstd_1_3_8_objs
+[  7%] Built target restore
+[  7%] Built target oblib_lib_simd
+[  8%] Built target oblib_lib_bitmap
+[  9%] Built target oblib_grpc
+[ 13%] Built target oblib_common
+[ 14%] Built target oblib_rpc
+[ 14%] Built target ob_query
+[ 14%] Built target ob_data_plane
+[ 18%] Built target ob_share_extra
+[ 18%] Built target ob_sql_simd
+[ 18%] Built target generate_syspack_source
+[ 23%] Built target ob_sql_server_parser_objects
+[ 28%] Built target ob_sql_extra
+[ 28%] Built target ob_standby
+[ 30%] Built target ob_pl
+[ 30%] Built target ob_standby_runtime
+[ 30%] Built target ob_storage_tablet_autoincrement_state
+[ 31%] Built target ob_logservice
+[ 32%] Built target ob_storage_simd
+[ 34%] Built target ob_malloc_object
+[ 35%] Built target zstd_1_3_8
+[ 36%] Built target ob_main
+[ 37%] Building CXX object src/rootserver/CMakeFiles/ob_rootserver.dir/Unity/unity_ob_rootserver_ob_rootserver_runtime_ddl_0_c___cxx.cxx.o
+[ 38%] Built target malloc_hook
+[ 38%] Built target ob_sql_server_parser_static
+[ 38%] Built target syspack_source
+[ 38%] Built target ob_malloc
+[ 39%] Built target compress
+[ 45%] Built target ob_server
+[ 49%] Built target oblib_lib
+[ 49%] Built target oblib
+[ 49%] Building CXX object src/share/CMakeFiles/ob_share.dir/Unity/unity_ob_share_ob_share_text_analysis_0_c___cxx.cxx.o
+[ 69%] Built target ob_sql
+[ 70%] Built target ob_sql_static
+[ 71%] Building CXX object src/storage/CMakeFiles/ob_storage.dir/Unity/unity_ob_storage_ob_storage_fts_0_c___cxx.cxx.o
+[ 72%] Building CXX object src/storage/CMakeFiles/ob_storage.dir/Unity/unity_ob_storage_ob_storage_rebase_0_c___cxx.cxx.o
+[ 87%] Built target ob_share
+[ 87%] Linking CXX static library libob_share_static.a
+[ 87%] Built target ob_share_static
+[ 96%] Built target ob_storage
+[ 96%] Linking CXX static library libob_storage_static.a
+[ 96%] Built target ob_storage_static
+[100%] Built target ob_rootserver
+[100%] Linking CXX static library liboceanbase_static.a
+[100%] Built target oceanbase_static
+[100%] Linking CXX executable seekdb
+[100%] Built target seekdb

@@ -1,0 +1,15 @@
+=====================================================================
+|ID|OPERATOR             |NAME                |EST.ROWS|EST.TIME(us)|
+---------------------------------------------------------------------
+|0 |SCALAR GROUP BY      |                    |1       |646183      |
+|1 |└─TEXT RETRIEVAL SCAN|docs(fti_content_ik)|14000   |645930      |
+=====================================================================
+Outputs & filters:
+-------------------------------------
+  0 - output([T_FUN_COUNT(*)]), filter(nil), rowset=256
+      group(nil), agg_func([T_FUN_COUNT(*)])
+  1 - output(nil), filter(nil), rowset=256
+      access(nil), partitions(p0)
+      is_index_back=false, is_global_index=false, 
+      calc_relevance=true, match_expr(MATCH(docs.content) AGAINST('倒排索引 tokenizer')), 
+      pushdown_match_filter(MATCH(docs.content) AGAINST('倒排索引 tokenizer'))

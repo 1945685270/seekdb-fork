@@ -1,0 +1,13 @@
+PHASE correctness
+PASS: 488 token cases and 240 complete MATCH/LIMIT result sets match baseline
+PHASE after
+/workspace/seekdb/fts-round2-validate.sh: line 17: 517117 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-2
+/workspace/seekdb/fts-round2-validate.sh: line 17: 517614 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-2
+/workspace/seekdb/fts-round2-validate.sh: line 17: 518088 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE before-3
+/workspace/seekdb/fts-round2-validate.sh: line 17: 518548 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE after-3
+/workspace/seekdb/fts-round2-validate.sh: line 17: 519020 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+COMPLETE

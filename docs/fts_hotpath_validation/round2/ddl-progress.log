@@ -1,0 +1,16 @@
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 538694 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE ddl-before-1
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 538946 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE ddl-after-1
+PASS: 536 token cases and 240 complete MATCH/LIMIT result sets match baseline
+PASS: 8 concurrent table lifecycles, IK/BENG, empty/nonempty builds, duplicate DDL, rebuild and DML
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 539420 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE ddl-before-2
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 543123 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE ddl-after-2
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 543571 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE ddl-before-3
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 544039 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE ddl-after-3
+/workspace/seekdb/fts-round2-ddl-validate.sh: line 17: 544510 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+DDL_COMPLETE

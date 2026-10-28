@@ -1,0 +1,15 @@
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 528445 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE buffer-before-1
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 528713 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE buffer-after-1
+PASS: 536 token cases and 240 complete MATCH/LIMIT result sets match baseline
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 529175 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE buffer-before-2
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 529703 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE buffer-after-2
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 530148 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE buffer-before-3
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 530637 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+PHASE buffer-after-3
+/workspace/seekdb/fts-round2-buffer-validate.sh: line 17: 531090 Killed                  "$1" --nodaemon --base-dir "$out/run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=2G --parameter datafile_maxsize=3G --parameter log_disk_size=2G --log-level WARN > "$out/console-$2.log" 2>&1
+BUFFER_COMPLETE

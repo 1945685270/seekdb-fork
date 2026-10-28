@@ -1,0 +1,148 @@
+diff --git a/src/share/text_analysis/ob_token_stream.cpp b/src/share/text_analysis/ob_token_stream.cpp
+index ab854c17d..df72fa6ad 100644
+--- a/src/share/text_analysis/ob_token_stream.cpp
++++ b/src/share/text_analysis/ob_token_stream.cpp
+@@ -250,7 +250,6 @@ int ObBasicEnglishNormalizer::get_next(ObDatum &next_token, int64_t &token_freq)
+   } else {
+     next_token.reset();
+     token_freq = 0;
+-    norm_allocator_.reuse();
+     ObDatum tmp_datum;
+     bool found_alnum = false;
+     uint32_t norm_token_len = 0;
+@@ -301,9 +300,24 @@ int ObBasicEnglishNormalizer::get_next(ObDatum &next_token, int64_t &token_freq)
+     } else {
+       ObString norm_alnum_token(norm_token_len, norm_token_ptr);
+       ObString norm_lower_token;
+-      if (OB_FAIL(ObCharset::tolower(cs_, norm_alnum_token, norm_lower_token, norm_allocator_))) {
++      const int64_t capacity = static_cast<int64_t>(norm_token_len) * cs_->casedn_multiply;
++      if (capacity > 0 && capacity <= sizeof(norm_buffer_)) {
++        // Match ObCharset::tolower's in-place contract for single-size
++        // mappings (including binary/8-bit charsets).
++        char *source = const_cast<char *>(norm_token_ptr);
++        if (1 == cs_->casedn_multiply) {
++          MEMCPY(norm_buffer_, norm_token_ptr, norm_token_len);
++          source = norm_buffer_;
++        }
++        const size_t length = cs_->cset->casedn(cs_, source, norm_token_len,
++            norm_buffer_, capacity);
++        next_token.set_string(norm_buffer_, static_cast<uint32_t>(length));
+       } else {
+-        next_token.set_string(norm_lower_token);
++        norm_allocator_.reuse();
++        if (OB_FAIL(ObCharset::tolower(cs_, norm_alnum_token, norm_lower_token, norm_allocator_))) {
++        } else {
++          next_token.set_string(norm_lower_token);
++        }
+       }
+     }
+   }
+diff --git a/src/share/text_analysis/ob_token_stream.h b/src/share/text_analysis/ob_token_stream.h
+index 8db7f94a3..70aa873eb 100644
+--- a/src/share/text_analysis/ob_token_stream.h
++++ b/src/share/text_analysis/ob_token_stream.h
+@@ -132,6 +132,9 @@ public:
+   virtual int get_next(ObDatum &next_token, int64_t &token_freq) override;
+ private:
+   ObArenaAllocator norm_allocator_;
++  // A stream token remains valid until the next get_next()/reuse()/reset().
++  // Keep common tokens inline; oversized case mappings use the arena.
++  char norm_buffer_[256];
+ };
+ 
+ // group (deduplicate) and count
+diff --git a/src/storage/fts/dict/ob_ft_range_dict.cpp b/src/storage/fts/dict/ob_ft_range_dict.cpp
+index b61365ab6..147185f69 100644
+--- a/src/storage/fts/dict/ob_ft_range_dict.cpp
++++ b/src/storage/fts/dict/ob_ft_range_dict.cpp
+@@ -419,6 +419,8 @@ int ObFTRangeDict::build_dict_from_cache(const ObFTCacheRangeContainer &range_co
+       range.end_ = dat->end_word_;
+       range.dict_ = dict;
+       if (OB_FAIL(range_dicts_.push_back(range))) {
++        dict->~ObFTCacheDict();
++        range_alloc_.free(dict);
+       }
+     }
+   }
+diff --git a/src/storage/fts/dict/ob_ft_range_dict.h b/src/storage/fts/dict/ob_ft_range_dict.h
+index bbbb405d6..0b25ec516 100644
+--- a/src/storage/fts/dict/ob_ft_range_dict.h
++++ b/src/storage/fts/dict/ob_ft_range_dict.h
+@@ -21,6 +21,7 @@
+ #include "lib/allocator/ob_allocator.h"
+ #include "lib/allocator/page_arena.h"
+ #include "lib/container/ob_vector.h"
++#include "lib/container/ob_array.h"
+ #include "lib/utility/ob_macro_utils.h"
+ #include "share/rc/ob_server_runtime.h"
+ #include "storage/fts/dict/ob_ft_cache_container.h"
+@@ -38,11 +39,11 @@ public:
+   ObFTRangeDict(ObIAllocator &alloc,
+                 ObFTCacheRangeContainer *range_container,
+                 const ObFTDictDesc &desc)
+-      : is_inited_(false), desc_(desc), range_alloc_(lib::ObMemAttr("Range Dict")),
+-        range_dicts_(&range_alloc_), range_container_(range_container)
++      : is_inited_(false), desc_(desc), range_alloc_(alloc),
++        range_dicts_(), range_container_(range_container)
+   {
+   }
+-  ~ObFTRangeDict() override{};
++  ~ObFTRangeDict() override { destroy(); }
+ 
+ public:
+   struct ObFTRange final
+@@ -92,9 +93,9 @@ private:
+   {
+     for (int64_t i = 0; i < range_dicts_.size(); i++) {
+       range_dicts_[i].dict_->~ObIFTDict(); // destroy dict
++      range_alloc_.free(range_dicts_[i].dict_);
+     }
+     range_dicts_.reset();
+-    range_alloc_.reset();
+   }
+ 
+   int find_first_char_range(const ObString &single_word, ObIFTDict *&dict) const;
+@@ -103,8 +104,10 @@ private:
+   static constexpr int DEFAULT_KEY_PER_RANGE = 50000; // by estimated
+   bool is_inited_;
+   ObFTDictDesc desc_;
+-  ObArenaAllocator range_alloc_;
+-  ObVector<ObFTRange, ObArenaAllocator> range_dicts_;
++  // These views live no longer than the parser. Reuse its allocator instead
++  // of allocating a separate arena page for each dictionary on every document.
++  ObIAllocator &range_alloc_;
++  ObSEArray<ObFTRange, 8> range_dicts_;
+   ObFTCacheRangeContainer *range_container_; // only used to read cache
+ 
+ private:
+diff --git a/src/storage/fts/ob_fts_stop_word.cpp b/src/storage/fts/ob_fts_stop_word.cpp
+index 4cde6a767..3036b944a 100644
+--- a/src/storage/fts/ob_fts_stop_word.cpp
++++ b/src/storage/fts/ob_fts_stop_word.cpp
+@@ -198,20 +198,18 @@ int ObAddWord::check_stopword(const ObFTWord &ft_word, bool &is_stopword)
+ int ObAddWord::groupby_word(const ObFTWord &word, const int64_t word_freq)
+ {
+   int ret = OB_SUCCESS;
+-  int64_t word_count = 0;
+   if (OB_UNLIKELY(word.empty() || word_freq <= 0)) {
+     ret = OB_INVALID_ARGUMENT;
+   } else if (!flag_.groupby_word()) {
+     if (OB_FAIL(word_map_.set_refactored(word, 1/*word count*/))) {
+     }
+-  } else if (OB_FAIL(word_map_.get_refactored(word, word_count)) && OB_HASH_NOT_EXIST != ret) {
+   } else {
+-    if (OB_HASH_NOT_EXIST == ret) {
+-      word_count = 1;
+-    } else {
+-      word_count += word_freq;
+-    }
+-    if (OB_FAIL(word_map_.set_refactored(word, word_count, 1/*overwrite*/))) {
++    // Keep the existing first-occurrence count and key ownership semantics,
++    // but hash and search the bucket only once for both insert and update.
++    auto add_frequency = [word_freq](auto &entry) {
++      entry.second += word_freq;
++    };
++    if (OB_FAIL(word_map_.set_or_update(word, 1, add_frequency))) {
+     }
+   }
+   return ret;

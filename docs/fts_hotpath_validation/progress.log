@@ -1,0 +1,10 @@
+PHASE baseline correctness
+Recorded 488 token cases and 240 complete MATCH/LIMIT result sets
+PHASE baseline benchmark
+/workspace/seekdb/fts-hotpath-validate.sh: line 22: 118865 Killed                  "$1" --nodaemon --base-dir "$run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=4G --parameter datafile_maxsize=8G --parameter log_disk_size=2G --log-level ERROR > "$out/console-$2.log" 2>&1
+PHASE compile
+PHASE optimized correctness
+PASS: 488 token cases and 240 complete MATCH/LIMIT result sets match baseline
+PHASE optimized benchmark
+/workspace/seekdb/fts-hotpath-validate.sh: line 22: 119783 Killed                  "$1" --nodaemon --base-dir "$run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=4G --parameter datafile_maxsize=8G --parameter log_disk_size=2G --log-level ERROR > "$out/console-$2.log" 2>&1
+COMPLETE

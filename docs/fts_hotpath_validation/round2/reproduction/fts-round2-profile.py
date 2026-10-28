@@ -1,0 +1,10 @@
+from pathlib import Path
+p=Path('/workspace/seekdb/file-sql-validation/src/storage/fts/ob_fts_parser_helper.cpp')
+out=Path('/workspace/seekdb/fts-round2')
+s=p.read_text(); (out/'parser-helper.original.cpp').write_text(s)
+s=s.replace('#include "object/ob_object.h"','#include "object/ob_object.h"\n#include <time.h>\n#include <stdio.h>\nstatic long long fts_tick() { timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000000000LL + t.tv_nsec; }')
+s=s.replace('    if (OB_FAIL(parser_desc->segment(&param, iter))) {','    const auto fts_begin = fts_tick();\n    long long fts_init = 0, fts_next = 0, fts_add = 0;\n    if (OB_FAIL(parser_desc->segment(&param, iter))) {')
+s=s.replace('      while (OB_SUCC(ret)) {\n        if (OB_FAIL(iter->get_next_token','      fts_init = fts_tick() - fts_begin;\n      while (OB_SUCC(ret)) {\n        const auto fts_token_begin = fts_tick();\n        if (OB_FAIL(iter->get_next_token')
+s=s.replace('        } else if (OB_FAIL(add_word.process_word(word, word_len, char_cnt, word_freq))) {','        } else if (FALSE_IT(fts_next += fts_tick() - fts_token_begin)) {\n        } else if (OB_FAIL(add_word.process_word(word, word_len, char_cnt, word_freq))) {')
+s=s.replace('      if (OB_ITER_END == ret) {\n        ret = OB_SUCCESS;\n      }\n    }\n    if (OB_NOT_NULL(iter)) {','      if (OB_ITER_END == ret) {\n        ret = OB_SUCCESS;\n      }\n    }\n    const auto fts_elapsed = fts_tick() - fts_begin;\n    static thread_local long long calls = 0, init_ns = 0, next_ns = 0, total_ns = 0;\n    ++calls; init_ns += fts_init; next_ns += fts_next; total_ns += fts_elapsed;\n    if (calls % 1000 == 0) { fprintf(stderr, "FTS_PROFILE calls=%lld init_ns=%lld next_ns=%lld total_ns=%lld\\n", calls, init_ns, next_ns, total_ns); }\n    if (OB_NOT_NULL(iter)) {')
+p.write_text(s)

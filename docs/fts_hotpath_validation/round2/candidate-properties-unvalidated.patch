@@ -1,0 +1,250 @@
+diff --git a/src/data_plane/api/data_plane/fts/ob_fts_parser_helper.h b/src/data_plane/api/data_plane/fts/ob_fts_parser_helper.h
+index c8c62c32e..ab4613a9b 100644
+--- a/src/data_plane/api/data_plane/fts/ob_fts_parser_helper.h
++++ b/src/data_plane/api/data_plane/fts/ob_fts_parser_helper.h
+@@ -161,6 +161,9 @@ public:
+       common::ObIAllocator *allocator,
+       const common::ObString &parser_name,
+       const common::ObString &parser_properties);
++  // Accept already validated JSON properties without serializing and parsing again.
++  int init(common::ObIAllocator *allocator, const common::ObString &parser_name,
++      const ObFTParserJsonProps &parser_properties);
+   /**
+    * Split document into multiple words
+    *
+diff --git a/src/data_plane/api/data_plane/fts/ob_fts_parser_property.h b/src/data_plane/api/data_plane/fts/ob_fts_parser_property.h
+index b22bd2f21..c90166ea4 100644
+--- a/src/data_plane/api/data_plane/fts/ob_fts_parser_property.h
++++ b/src/data_plane/api/data_plane/fts/ob_fts_parser_property.h
+@@ -137,6 +137,8 @@ public:
+   ObFTParserProperty();
+   ~ObFTParserProperty() = default;
+   int parse_for_parser_helper(const ObFTParser &parser, const ObString &json_str);
++  int parse_for_parser_helper(const ObFTParser &parser,
++      const ObFTParserJsonProps &props, const bool use_defaults = false);
+ 
+   bool is_equal(const ObFTParserProperty &other) const
+   {
+diff --git a/src/sql/engine/expr/ob_expr_tokenize.cpp b/src/sql/engine/expr/ob_expr_tokenize.cpp
+index ad9500996..a1a333adc 100644
+--- a/src/sql/engine/expr/ob_expr_tokenize.cpp
++++ b/src/sql/engine/expr/ob_expr_tokenize.cpp
+@@ -90,7 +90,7 @@ int ObExprTokenize::tokenize_fulltext(const TokenizeParam &param,
+ 
+   if (TokenizeParam::OUTPUT_MODE::DEFAULT != mode && TokenizeParam::OUTPUT_MODE::ALL != mode) {
+     ret = OB_INVALID_ARGUMENT;
+-  } else if (OB_FAIL(tokenize_helper.init(&allocator, param.parser_name_, param.properties_))) {
++  } else if (OB_FAIL(tokenize_helper.init(&allocator, param.parser_name_, param.normalized_properties_))) {
+   } else if (OB_FAIL(token_map.create(ft_word_bkt_cnt, common::ObMemAttr("FTWordMap")))) {
+   } else if (
+       (0 != param.fulltext_.length())
+@@ -375,7 +375,7 @@ int ObExprTokenize::parse_parser_properties(const ObExpr &expr,
+ int ObExprTokenize::TokenizeParam::reform_parser_properties(const ObString &properties)
+ {
+   int ret = OB_SUCCESS;
+-  storage::ObFTParserJsonProps parser_properties;
++  storage::ObFTParserJsonProps &parser_properties = normalized_properties_;
+ 
+   if (OB_FAIL(parser_properties.init())) {
+   } else if (OB_FAIL(parser_properties.parse_from_valid_str(properties))) {
+@@ -383,7 +383,6 @@ int ObExprTokenize::TokenizeParam::reform_parser_properties(const ObString &prop
+   } else if (OB_FAIL(parser_properties.rebuild_props_for_ddl(parser_name_,
+                                                              ObCollationType::CS_TYPE_UTF8MB4_BIN,
+                                                              true))) {
+-  } else if (OB_FAIL(parser_properties.to_format_json(allocator_, properties_))) {
+   }
+ 
+   return ret;
+diff --git a/src/sql/engine/expr/ob_expr_tokenize.h b/src/sql/engine/expr/ob_expr_tokenize.h
+index f0eba871d..7959f9076 100644
+--- a/src/sql/engine/expr/ob_expr_tokenize.h
++++ b/src/sql/engine/expr/ob_expr_tokenize.h
+@@ -71,6 +71,7 @@ private:
+     mutable ObArenaAllocator allocator_;
+     ObString parser_name_;
+     ObString properties_;
++    storage::ObFTParserJsonProps normalized_properties_;
+     ObObjMeta meta_;
+     ObString fulltext_;
+     enum OUTPUT_MODE
+diff --git a/src/storage/fts/ob_fts_parser_helper.cpp b/src/storage/fts/ob_fts_parser_helper.cpp
+index 2c92ee45d..0e74df5d3 100644
+--- a/src/storage/fts/ob_fts_parser_helper.cpp
++++ b/src/storage/fts/ob_fts_parser_helper.cpp
+@@ -350,6 +350,32 @@ int ObFTParseHelper::init(
+   return ret;
+ }
+ 
++int ObFTParseHelper::init(
++    common::ObIAllocator *allocator,
++    const common::ObString &parser_name,
++    const ObFTParserJsonProps &parser_properties)
++{
++  int ret = OB_SUCCESS;
++  if (OB_UNLIKELY(is_inited_)) {
++    ret = OB_INIT_TWICE;
++  } else if (OB_ISNULL(allocator) || OB_UNLIKELY(parser_name.empty())) {
++    ret = OB_INVALID_ARGUMENT;
++  } else if (OB_FAIL(parser_name_.parse_from_str(parser_name.ptr(), parser_name.length()))) {
++  } else if (OB_FAIL(parser_property_.parse_for_parser_helper(parser_name_, parser_properties))) {
++  } else if (OB_FAIL(parser_name_.get_desc(parser_desc_))) {
++  } else if (OB_ISNULL(parser_desc_)) {
++    ret = OB_ERR_UNEXPECTED;
++  } else if (OB_FAIL(set_add_word_flag(*parser_desc_))) {
++  } else {
++    allocator_ = allocator;
++    is_inited_ = true;
++  }
++  if (OB_FAIL(ret) && OB_UNLIKELY(!is_inited_)) {
++    reset();
++  }
++  return ret;
++}
++
+ void ObFTParseHelper::reset()
+ {
+   parser_desc_ = nullptr;
+diff --git a/src/storage/fts/ob_fts_parser_property.cpp b/src/storage/fts/ob_fts_parser_property.cpp
+index 4dd18456d..09d42c4cc 100644
+--- a/src/storage/fts/ob_fts_parser_property.cpp
++++ b/src/storage/fts/ob_fts_parser_property.cpp
+@@ -1020,49 +1020,57 @@ int ObFTParserProperty::parse_for_parser_helper(const ObFTParser &parser, const
+   if (OB_FAIL(props.init())) {
+   } else if (OB_FAIL(props.parse_from_valid_str(json_str))) {
+   } else {
+-    if (parser.is_ik()) {
+-      // set dict tables and copy dict name
+-      dict_table_ = ObString(ObFTSLiteral::CONFIG_NAME_DICT_TABLE);
+-      stopword_table_ = ObString(ObFTSLiteral::CONFIG_NAME_STOPWORD_TABLE);
+-      quantifier_table_ = ObString(ObFTSLiteral::CONFIG_NAME_QUANTIFIER_TABLE);
+-      ObString ik_smart;
+-      if (OB_FAIL(props.config_get_ik_mode(ik_smart))) {
++    ret = parse_for_parser_helper(parser, props, json_str.empty());
++  }
++  return ret;
++}
++
++int ObFTParserProperty::parse_for_parser_helper(
++    const ObFTParser &parser, const ObFTParserJsonProps &props, const bool use_defaults)
++{
++  int ret = OB_SUCCESS;
++  if (parser.is_ik()) {
++    // set dict tables and copy dict name
++    dict_table_ = ObString(ObFTSLiteral::CONFIG_NAME_DICT_TABLE);
++    stopword_table_ = ObString(ObFTSLiteral::CONFIG_NAME_STOPWORD_TABLE);
++    quantifier_table_ = ObString(ObFTSLiteral::CONFIG_NAME_QUANTIFIER_TABLE);
++    ObString ik_smart;
++    if (OB_FAIL(props.config_get_ik_mode(ik_smart))) {
++    } else {
++      if (0 == ik_smart.case_compare(ObString(ObFTSLiteral::FT_IK_MODE_SMART))) {
++        ik_mode_smart_ = true;
++      } else if (0 == ik_smart.case_compare(ObString(ObFTSLiteral::FT_IK_MODE_MAX_WORD))) {
++        ik_mode_smart_ = false;
+       } else {
+-        if (0 == ik_smart.case_compare(ObString(ObFTSLiteral::FT_IK_MODE_SMART))) {
+-          ik_mode_smart_ = true;
+-        } else if (0 == ik_smart.case_compare(ObString(ObFTSLiteral::FT_IK_MODE_MAX_WORD))) {
+-          ik_mode_smart_ = false;
+-        } else {
+-          ret = OB_INVALID_ARGUMENT;
+-        }
+-      }
+-    } else if (parser.is_space()) {
+-      if (json_str.empty()) {
+-        min_token_size_ = ObFTSLiteral::FT_DEFAULT_MIN_TOKEN_SIZE;
+-        max_token_size_ = ObFTSLiteral::FT_DEFAULT_MAX_TOKEN_SIZE;
+-      } else if (OB_FAIL(props.config_get_min_token_size(min_token_size_))) {
+-      } else if (OB_FAIL(props.config_get_max_token_size(max_token_size_))) {
+-      }
+-    } else if (parser.is_ngram()) {
+-      if (json_str.empty()) {
+-        ngram_token_size_ = ObFTSLiteral::FT_DEFAULT_NGRAM_TOKEN_SIZE;
+-      } else if (OB_FAIL(props.config_get_ngram_token_size(ngram_token_size_))) {
+-      }
+-    } else if (parser.is_beng()) {
+-      if (json_str.empty()) {
+-        min_token_size_ = ObFTSLiteral::FT_DEFAULT_MIN_TOKEN_SIZE;
+-        max_token_size_ = ObFTSLiteral::FT_DEFAULT_MAX_TOKEN_SIZE;
+-      } else if (OB_FAIL(props.config_get_min_token_size(min_token_size_))) {
+-      } else if (OB_FAIL(props.config_get_max_token_size(max_token_size_))) {
+-      }
+-    } else if (parser.is_ngram2()) {
+-      if (json_str.empty()) {
+-        min_ngram_token_size_ = ObFTSLiteral::FT_DEFAULT_MIN_NGRAM_SIZE;
+-        max_ngram_token_size_ = ObFTSLiteral::FT_DEFAULT_MAX_NGRAM_SIZE;
+-      } else if (OB_FAIL(props.config_get_min_ngram_token_size(min_ngram_token_size_))) {
+-      } else if (OB_FAIL(props.config_get_max_ngram_token_size(max_ngram_token_size_))) {
++        ret = OB_INVALID_ARGUMENT;
+       }
+     }
++  } else if (parser.is_space()) {
++    if (use_defaults) {
++      min_token_size_ = ObFTSLiteral::FT_DEFAULT_MIN_TOKEN_SIZE;
++      max_token_size_ = ObFTSLiteral::FT_DEFAULT_MAX_TOKEN_SIZE;
++    } else if (OB_FAIL(props.config_get_min_token_size(min_token_size_))) {
++    } else if (OB_FAIL(props.config_get_max_token_size(max_token_size_))) {
++    }
++  } else if (parser.is_ngram()) {
++    if (use_defaults) {
++      ngram_token_size_ = ObFTSLiteral::FT_DEFAULT_NGRAM_TOKEN_SIZE;
++    } else if (OB_FAIL(props.config_get_ngram_token_size(ngram_token_size_))) {
++    }
++  } else if (parser.is_beng()) {
++    if (use_defaults) {
++      min_token_size_ = ObFTSLiteral::FT_DEFAULT_MIN_TOKEN_SIZE;
++      max_token_size_ = ObFTSLiteral::FT_DEFAULT_MAX_TOKEN_SIZE;
++    } else if (OB_FAIL(props.config_get_min_token_size(min_token_size_))) {
++    } else if (OB_FAIL(props.config_get_max_token_size(max_token_size_))) {
++    }
++  } else if (parser.is_ngram2()) {
++    if (use_defaults) {
++      min_ngram_token_size_ = ObFTSLiteral::FT_DEFAULT_MIN_NGRAM_SIZE;
++      max_ngram_token_size_ = ObFTSLiteral::FT_DEFAULT_MAX_NGRAM_SIZE;
++    } else if (OB_FAIL(props.config_get_min_ngram_token_size(min_ngram_token_size_))) {
++    } else if (OB_FAIL(props.config_get_max_ngram_token_size(max_ngram_token_size_))) {
++    }
+   }
+   return ret;
+ }
+diff --git a/unittest/sql/engine/basic/test_fts_hotpath.py b/unittest/sql/engine/basic/test_fts_hotpath.py
+index 2a5942a1f..cd3859c80 100644
+--- a/unittest/sql/engine/basic/test_fts_hotpath.py
++++ b/unittest/sql/engine/basic/test_fts_hotpath.py
+@@ -30,6 +30,11 @@ def statements():
+                "".join(chr(i) for i in range(128)),
+                "Token " * 1000, "数据库索引 " * 1000,
+                "x" * 84, "x" * 85, "x" * 1024, "word punctuation!!!"]
++    # Exercise inline-buffer boundaries and transitions back from the arena.
++    for size in (255, 256, 257, 1024):
++        samples += ["A" * size + " Small SMALL next",
++                    "É" * (size // 2) + " Mixed CASE café",
++                    "short " + "Z" * size + " short SHORT"]
+     rng = random.Random(71939)
+     alphabet = list("abcXYZ019 ,.!_\t\n\x00") + list("中国数据库日本語한글Ａ９é😀")
+     samples += ["".join(rng.choices(alphabet, k=rng.randrange(1, 160))) for _ in range(96)]
+@@ -37,7 +42,12 @@ def statements():
+     for parser, props in [("ik", '[{"output":"all"}]'),
+                           ("ik", '[{"output":"all"},{"additional_args":[{"ik_mode":"smart"}]}]'),
+                           ("beng", '[{"output":"all"}]'),
+-                          ("space", '[{"output":"all"}]')]:
++                          ("space", '[{"output":"all"}]'),
++                          ("ngram", '[{"output":"all"}]'),
++                          ("ngram2", '[{"output":"all"}]'),
++                          ("beng", '[]'),
++                          ("ik", '[]'),
++                          ("space", '[{"output":"all"},{"additional_args":[{"min_token_size":2},{"max_token_size":6}]}]')]:
+         for text in samples:
+             sql.append("SELECT 'token_%d', HEX(CAST(TOKENIZE(%s,'%s','%s') AS CHAR))"
+                        % (case, literal(text), parser, props))
+@@ -99,7 +109,10 @@ def main():
+         if line.startswith("token_"):
+             label, value = line.split("\t", 1)
+             # Preserve token array order as well as each token's frequency.
+-            decoded = bytes.fromhex(value).decode("utf-8")
++            try:
++                decoded = bytes.fromhex(value).decode("utf-8")
++            except (ValueError, UnicodeDecodeError) as error:
++                raise SystemExit("Invalid token JSON encoding in %s: %s" % (label, error))
+             rows.append([label, json.loads(decoded)])
+         else:
+             rows.append(line)

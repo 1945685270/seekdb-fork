@@ -1,0 +1,53 @@
+diff --git a/src/share/text_analysis/ob_token_stream.cpp b/src/share/text_analysis/ob_token_stream.cpp
+index ab854c17d..df72fa6ad 100644
+--- a/src/share/text_analysis/ob_token_stream.cpp
++++ b/src/share/text_analysis/ob_token_stream.cpp
+@@ -250,7 +250,6 @@ int ObBasicEnglishNormalizer::get_next(ObDatum &next_token, int64_t &token_freq)
+   } else {
+     next_token.reset();
+     token_freq = 0;
+-    norm_allocator_.reuse();
+     ObDatum tmp_datum;
+     bool found_alnum = false;
+     uint32_t norm_token_len = 0;
+@@ -301,9 +300,24 @@ int ObBasicEnglishNormalizer::get_next(ObDatum &next_token, int64_t &token_freq)
+     } else {
+       ObString norm_alnum_token(norm_token_len, norm_token_ptr);
+       ObString norm_lower_token;
+-      if (OB_FAIL(ObCharset::tolower(cs_, norm_alnum_token, norm_lower_token, norm_allocator_))) {
++      const int64_t capacity = static_cast<int64_t>(norm_token_len) * cs_->casedn_multiply;
++      if (capacity > 0 && capacity <= sizeof(norm_buffer_)) {
++        // Match ObCharset::tolower's in-place contract for single-size
++        // mappings (including binary/8-bit charsets).
++        char *source = const_cast<char *>(norm_token_ptr);
++        if (1 == cs_->casedn_multiply) {
++          MEMCPY(norm_buffer_, norm_token_ptr, norm_token_len);
++          source = norm_buffer_;
++        }
++        const size_t length = cs_->cset->casedn(cs_, source, norm_token_len,
++            norm_buffer_, capacity);
++        next_token.set_string(norm_buffer_, static_cast<uint32_t>(length));
+       } else {
+-        next_token.set_string(norm_lower_token);
++        norm_allocator_.reuse();
++        if (OB_FAIL(ObCharset::tolower(cs_, norm_alnum_token, norm_lower_token, norm_allocator_))) {
++        } else {
++          next_token.set_string(norm_lower_token);
++        }
+       }
+     }
+   }
+diff --git a/src/share/text_analysis/ob_token_stream.h b/src/share/text_analysis/ob_token_stream.h
+index 8db7f94a3..70aa873eb 100644
+--- a/src/share/text_analysis/ob_token_stream.h
++++ b/src/share/text_analysis/ob_token_stream.h
+@@ -132,6 +132,9 @@ public:
+   virtual int get_next(ObDatum &next_token, int64_t &token_freq) override;
+ private:
+   ObArenaAllocator norm_allocator_;
++  // A stream token remains valid until the next get_next()/reuse()/reset().
++  // Keep common tokens inline; oversized case mappings use the arena.
++  char norm_buffer_[256];
+ };
+ 
+ // group (deduplicate) and count

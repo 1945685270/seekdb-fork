@@ -1,0 +1,9 @@
+PHASE repeat-2 before
+/workspace/seekdb/fts-hotpath-repeat.sh: line 22: 120885 Killed                  "$1" --nodaemon --base-dir "$run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=4G --parameter datafile_maxsize=8G --parameter log_disk_size=2G --log-level ERROR > "$out/console-$2.log" 2>&1
+PHASE repeat-2 after
+/workspace/seekdb/fts-hotpath-repeat.sh: line 22: 121349 Killed                  "$1" --nodaemon --base-dir "$run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=4G --parameter datafile_maxsize=8G --parameter log_disk_size=2G --log-level ERROR > "$out/console-$2.log" 2>&1
+PHASE repeat-3 before
+/workspace/seekdb/fts-hotpath-repeat.sh: line 22: 121806 Killed                  "$1" --nodaemon --base-dir "$run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=4G --parameter datafile_maxsize=8G --parameter log_disk_size=2G --log-level ERROR > "$out/console-$2.log" 2>&1
+PHASE repeat-3 after
+/workspace/seekdb/fts-hotpath-repeat.sh: line 22: 122283 Killed                  "$1" --nodaemon --base-dir "$run" --port 32851 --parameter rpc_port=32852 --parameter memory_budget=16G --parameter datafile_size=4G --parameter datafile_maxsize=8G --parameter log_disk_size=2G --log-level ERROR > "$out/console-$2.log" 2>&1
+REPEATS COMPLETE
